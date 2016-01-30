@@ -75,13 +75,13 @@ public class CommandLine {
 			while ((line = br.readLine()) != null) {
 				String[] nodes = line.split(",");
 				for (String node : nodes) {
-					if (!networkNodes.containsKey(node)) {
-						System.err.println("Adding " + node + " to network...");
-						Router newRouter = new Router(node);
-						networkNodes.put(node, newRouter);
+					if (!networkNodes.containsKey(node.trim())) {
+						System.err.println("Adding " + node.trim() + " to network...");
+						Router newRouter = new Router(node.trim());
+						networkNodes.put(node.trim(), newRouter);
 					}
 				}
-				networkNodes.get(nodes[0]).addLink(networkNodes.get(nodes[1]));
+				networkNodes.get(nodes[0].trim()).addLink(networkNodes.get(nodes[1].trim()));
 			}
 			
 			br.close();

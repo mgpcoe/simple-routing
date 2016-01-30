@@ -16,14 +16,19 @@ public class Router {
 	}
 	
 	public void addLink(final Router router) {
+		System.err.println(hostname + " adding " + router.getHostname() + " to my list of active links");
 		links.add(router);
-		for (Router link : links) {
-			if (link == router) {
-				continue;
-			}
 
-//			link.receiveRoutingMap(this, links);
+		for (Router link : links) {
+			link.advertiseLink(this);
 		}		
+	}
+	
+	void advertiseLink(final Router router) {
+		if (!links.contains(router)) {
+			System.err.println(hostname + " Adding " + router.getHostname() + " to my list of active links");
+			links.add(router);
+		}
 	}
 	
 	void receiveRoutingMap(Router sender, HashSet<Router> incomingLinks) {
@@ -44,7 +49,9 @@ public class Router {
 			return true;
 		}
 		
+		System.err.println("I have " + links.size() + " active links.");
 		for (Router link : links) {
+			System.err.println("Have a link to " + link.getHostname());
 			if (link.getHostname().equals(destination)) {
 				return true;
 			}
