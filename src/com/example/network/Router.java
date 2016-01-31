@@ -1,13 +1,16 @@
 package com.example.network;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class Router {
 	private final String hostname;
 	private HashSet<Router> links;
-	private HashMap<String, Router> knownNodesAndGateways;
-	private HashMap<Router, Route> knownRoutes;
+	private HashMap<String, Set<Router>> knownNodesAndGateways;
+	private HashMap<Router, Set<Route>> knownRoutes;
 
 	public Router(final String hostname) {
 		this.hostname = hostname;
@@ -20,7 +23,7 @@ public class Router {
 		return this.hostname;
 	}
 	
-	HashMap<Router, Route> getRoutes() {
+	HashMap<Router, Set<Route>> getRoutes() {
 		// Not exactly safe!
 		return knownRoutes; 
 	}
@@ -43,8 +46,10 @@ public class Router {
 		}
 		
 		// Update local routing table with the routes from the new link
-		for (Route route : router.knownRoutes.values()) {
-			addUnknownNodesFromRoute(router, new Route(router, route));
+		for (Set<Route> routes : router.knownRoutes.values()) {
+			for (Route route : routes) {
+				addUnknownNodesFromRoute(router, new Route(router, route));
+			}
 		}
 		
 		// Propagate routing table changes through the network
@@ -56,21 +61,39 @@ public class Router {
 	}
 	
 	void addUnknownNodesFromRoute(final Router gateway, final Route route) {
+		System.err.println(hostname + ": processing route " + route.toString());
+
 		if (route.nextHop == this) {
+			System.err.println(hostname + ": next hop is myself, skipping...");
 			// terminate early so as not to store routing loops.
 			return;
 		}
 
 		if (!knownNodesAndGateways.keySet().contains(route.nextHop.getHostname())) {
-			knownNodesAndGateways.put(route.nextHop.getHostname(), gateway);
+			System.err.println(hostname + ": next hop " + route.nextHop.getHostname() + " is unknown, adding nodes and gateway to my cache");
+			Set<Router> gateways = knownNodesAndGateways.get(route.nextHop.getHostname());
+			if (gateways == null) {
+				gateways = new HashSet<>();
+			}
+			gateways.add(gateway);
+			knownNodesAndGateways.put(route.nextHop.getHostname(), gateways);
 		}
 
 		// recur until we reach the end of the route
 		if (route.route != null) {
+			System.err.println(hostname + ": route has more nodes, navigating down route...");
 			addUnknownNodesFromRoute(gateway, route.route);
 		}
 		
-		knownRoutes.put(route.nextHop, route);
+		if (knownRoutes.get(route.nextHop) == null) {
+			knownRoutes.put(route.nextHop, new HashSet<Route>());
+		}
+		
+		if (route.getEndOfRoute() != this) {
+			knownRoutes.get(route.nextHop).add(route);
+		} else {
+			System.err.println(hostname + ": route ends with me, skipping...");
+		}
 	}
 	
 	void receiveRoutingMap(Router sender, HashSet<Router> incomingLinks) {
@@ -110,6 +133,34 @@ public class Router {
 //		return false;
 	}
 	
+	public Set<Route> getRoutesToHost(final String destination) {
+		if (!canRouteTo(destination)) {
+			System.err.println("Wait a second, I can't route to " + destination);
+			// Fail fast!
+			return Collections.emptySet();
+		}
+		
+		final Set<Route> routesToHost = new HashSet<>();
+		
+		System.err.println("My network includes " + knownNodesAndGateways.keySet().size() + " other routers:");
+		for (String routerName : knownNodesAndGateways.keySet()) {
+			System.err.println(" - " + routerName);
+		}
+		final Set<Router> gatewaysToDestination = knownNodesAndGateways.get(destination);
+		System.err.println("I have " + gatewaysToDestination.size() + " route(s) to reach " + destination);
+		for (Router gateway : gatewaysToDestination) {
+			System.err.println("I know of " + knownRoutes.get(gateway).size() + " route(s) starting with " + gateway.getHostname());
+			for (Route route : knownRoutes.get(gateway)) {
+				final Router endOfRoute = route.getEndOfRoute();
+				if (endOfRoute.getHostname().equals(destination)) {
+					routesToHost.add(new Route(this, route));
+				}
+			}
+		}
+		
+		return routesToHost;
+	}
+	
 	/**
 	 * Nodes with duplicate hostnames are considered to be identical
 	 * 
@@ -146,13 +197,31 @@ public class Router {
 		return true;
 	}
 
-	private class Route {
+	class Route {
 		private final Router nextHop;
 		private final Route route;
 		
 		Route(final Router nextHop, final Route route) {
 			this.nextHop = nextHop;
 			this.route = route;
+		}
+		
+		Router getEndOfRoute() {
+			if (route != null) {
+				return route.getEndOfRoute();
+			}
+			
+			return nextHop;
+		}
+		
+		@Override
+		public String toString() {
+			String routePath = nextHop.getHostname();
+			if (route != null) {
+				routePath += "->" + route.toString();
+			}
+			
+			return routePath;
 		}
 
 		/**

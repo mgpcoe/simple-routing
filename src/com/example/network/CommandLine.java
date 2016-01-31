@@ -1,9 +1,12 @@
 package com.example.network;
 
+import com.example.network.Router.Route;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Set;
 
 public class CommandLine {
 	private static final String LINKS_FILE = "stations.csv";
@@ -43,7 +46,13 @@ public class CommandLine {
 		validateRouteNodes(sourceHostname, destinationHostname);		
 		validateRouteExists(sourceHostname, destinationHostname);
 		
-		System.out.println("Found a route from " + sourceHostname + " to " + destinationHostname);
+		System.err.println("Found at least one route from " + sourceHostname + " to " + destinationHostname);
+		
+		final Set<Route> routesToDestination = networkNodes.get(sourceHostname).getRoutesToHost(destinationHostname);
+		System.err.println("Retrieved " + routesToDestination.size() + " known routes.");
+		for (Route route : routesToDestination) {
+			System.out.println(route.toString());
+		}
 	}
 
 	private void validateRouteExists(final String sourceHostname, final String destinationHostname) {
